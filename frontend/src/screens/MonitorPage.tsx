@@ -1,5 +1,5 @@
 import { Check, Grid2X2 } from "lucide-react";
-import { useEffect, useMemo, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { PLATFORM_LABEL, type LivePlatform } from "@/api";
 import { RoomTile } from "@/features/multiview/RoomTile";
 import { DEFAULT_DANMU_SETTINGS } from "@/features/player/danmuSettings";
@@ -37,7 +37,32 @@ export function MonitorPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [dragOver, setDragOver] = useState(false);
+  const errorTimerRef = useRef<number | null>(null);
   const placements = useMemo(() => packRoomGrid(rooms, grid), [grid, rooms]);
+
+  const showError = (message: string) => {
+    if (errorTimerRef.current !== null) window.clearTimeout(errorTimerRef.current);
+    setError(message);
+    errorTimerRef.current = window.setTimeout(() => {
+      errorTimerRef.current = null;
+      setError("");
+    }, 1_000);
+  };
+
+  const clearError = () => {
+    if (errorTimerRef.current !== null) {
+      window.clearTimeout(errorTimerRef.current);
+      errorTimerRef.current = null;
+    }
+    setError("");
+  };
+
+  useEffect(
+    () => () => {
+      if (errorTimerRef.current !== null) window.clearTimeout(errorTimerRef.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!notice) return;
@@ -50,11 +75,11 @@ export function MonitorPage() {
     const key = `${platform}:${roomId}`;
     if (rooms.some((room) => room.key === key)) {
       setNotice(`${platformLabel(platform)}房间 ${roomId} 已在工作台中`);
-      setError("");
+      clearError();
       return;
     }
     if (rooms.length >= MAX_ROOMS) {
-      setError("工作台最多同时监看 16 个不同房间");
+      showError("工作台最多同时监看 16 个不同房间");
       setNotice("");
       return;
     }
@@ -74,7 +99,7 @@ export function MonitorPage() {
     ];
     const nextGrid = fitRoomGrid(nextRooms, grid);
     if (!nextGrid) {
-      setError("当前网格无法容纳更多房间");
+      showError("当前网格无法容纳更多房间");
       setNotice("");
       return;
     }
@@ -84,7 +109,7 @@ export function MonitorPage() {
       grid: nextGrid,
       audioFocusKeys: previous.rooms.length === 0 ? [key] : previous.audioFocusKeys,
     }));
-    setError("");
+    clearError();
     setNotice(`${platformLabel(platform)}房间 ${roomId} 已加入工作台`);
   };
 
@@ -131,7 +156,7 @@ export function MonitorPage() {
         }
         addRoom(value.platform as LivePlatform, value.roomId);
       } catch (reason) {
-        setError(reason instanceof Error ? reason.message : "无法添加拖入的关注主播");
+        showError(reason instanceof Error ? reason.message : "无法添加拖入的关注主播");
         setNotice("");
       }
       return;
@@ -142,13 +167,13 @@ export function MonitorPage() {
     event.preventDefault();
     event.stopPropagation();
     setDragOver(false);
-    setError("");
+    clearError();
     setNotice("");
     try {
       const parsed = parseLiveRoomUrl(url);
       addRoom(parsed.platform, parsed.roomId);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "无法识别拖入的直播间链接");
+      showError(reason instanceof Error ? reason.message : "无法识别拖入的直播间链接");
     }
   };
 
@@ -165,12 +190,12 @@ export function MonitorPage() {
     const nextRooms = rooms.map((room) => (room.key === key ? { ...room, size } : room));
     const nextGrid = fitRoomGrid(nextRooms, grid);
     if (!nextGrid) {
-      setError("卡片尺寸与当前网格不兼容，请缩小卡片或扩大网格");
+      showError("卡片尺寸与当前网格不兼容，请缩小卡片或扩大网格");
       setNotice("");
       return;
     }
     setWorkspace((previous) => ({ ...previous, rooms: nextRooms, grid: nextGrid }));
-    setError("");
+    clearError();
   };
 
   const handleAudioFocus = (key: string, multiple: boolean) => {
@@ -199,7 +224,7 @@ export function MonitorPage() {
       rooms: previous.rooms.filter((room) => room.key !== key),
       audioFocusKeys: previous.audioFocusKeys.filter((roomKey) => roomKey !== key),
     }));
-    setError("");
+    clearError();
     setNotice("房间已从工作台移除");
   };
 

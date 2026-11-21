@@ -222,6 +222,10 @@ export function RoomTile({
 
   const displayName = info?.nickname || `房间 ${room.roomId}`;
   const active = room.danmakuEnabled;
+  const qualityOptions = (info?.variants ?? []).map((item) => ({
+    id: item.id,
+    label: /蓝光|bluray/i.test(item.label) ? "蓝光" : item.label,
+  }));
 
   return (
     <article
@@ -375,13 +379,13 @@ export function RoomTile({
             <button
               type="button"
               className={cn(styles.iconButton, focused && styles.activeButton)}
-              onClick={(event) => {
+              onClick={() => {
                 if (room.volume > 1) player.activateAudioBoost();
-                onAudioFocus(room.key, event.shiftKey);
+                onAudioFocus(room.key, true);
               }}
               aria-pressed={focused}
-              title={focused ? "当前有声；Shift 点击可多选" : "设为音频焦点；Shift 点击可多选"}
-              aria-label={focused ? "音频焦点已开启" : "设为音频焦点"}
+              title={focused ? "关闭本房间声音" : "开启本房间声音"}
+              aria-label={focused ? "关闭本房间声音" : "开启本房间声音"}
             >
               {focused ? <Volume2 size={18} /> : <VolumeX size={18} />}
             </button>
@@ -404,10 +408,7 @@ export function RoomTile({
               label="清晰度"
               valueId={variant?.id ?? ""}
               valueLabel={variant?.label ?? "清晰度"}
-              options={(info?.variants ?? []).map((item) => ({
-                id: item.id,
-                label: item.label,
-              }))}
+              options={qualityOptions}
               onSelect={(qualityId) => onQualityChange(room.key, qualityId)}
             />
           </div>
