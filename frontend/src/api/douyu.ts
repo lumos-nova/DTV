@@ -9,7 +9,16 @@ import {
   mapStreamer,
   mapStreamerPage,
 } from "./mappers";
-import type { Category, CategoryGroup, DanmakuMessage, SearchHit, StreamInfo, Streamer, StreamerPage } from "./types";
+import type {
+  Category,
+  CategoryGroup,
+  DanmakuMessage,
+  LivePlatform,
+  SearchHit,
+  StreamInfo,
+  Streamer,
+  StreamerPage,
+} from "./types";
 
 /**
  * 斗鱼后端适配层。
@@ -45,39 +54,34 @@ function toPromise<T>(p: Promise<T>): Promise<T> {
 }
 
 /**
- * 订阅弹幕的通用实现（斗鱼/虎牙共用）。
- *
- * 后端同一时刻只监听一个房间（与旧版一致的业务规则），因此：
- *   1. 先调用平台的 StartDanmaku(roomId)
- *   2. 订阅全局事件，按 payload.roomId 过滤，丢弃上一个房间的残留弹幕
- *   3. 返回的函数先取消订阅，再 StopDanmaku
+ * 订阅弹幕的通用实现。先安装事件监听，再启动房间 session；
+ * 取消订阅时等待 Start 完成后再 Stop，避免 IPC 调用竞态留下后台连接。
  */
 export function createDanmakuSubscription(
   roomId: string,
   start: (roomId: string) => Promise<void>,
   stop: (roomId: string) => Promise<void>,
   onMessage: (msg: DanmakuMessage) => void,
+  platform: LivePlatform,
 ): () => void {
   let stopped = false;
-
-  void start(roomId).catch((err: unknown) => {
-    console.error("[danmaku] 启动监听失败", err);
-  });
-
   const off = Events.On(DANMAKU_EVENT, (ev: { data: DanmakuEventPayload }) => {
     if (stopped) return;
     const payload = ev?.data;
     // 房间切换的瞬间可能收到上一个房间的残留消息，必须过滤
-    if (!payload || payload.roomId !== roomId) return;
+    if (!payload || payload.roomId !== roomId || payload.platform !== platform) return;
     onMessage(payload.message);
+  });
+  const startPromise = start(roomId).catch((err: unknown) => {
+    console.error("[danmaku] 启动监听失败", err);
   });
 
   return () => {
     stopped = true;
     off();
-    void stop(roomId).catch((err: unknown) => {
-      console.error("[danmaku] 停止监听失败", err);
-    });
+    void startPromise
+      .then(() => stop(roomId))
+      .catch((err: unknown) => console.error("[danmaku] 停止监听失败", err));
   };
 }
 
@@ -129,6 +133,7 @@ export const douyuApi = {
       (id) => toPromise(Douyu.StartDanmaku(id)),
       (id) => toPromise(Douyu.StopDanmaku(id)),
       onMessage,
+      "douyu",
     );
   },
 };

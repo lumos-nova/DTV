@@ -8,7 +8,14 @@ import {
   mapStreamer,
   mapStreamerPage,
 } from "./mappers";
-import type { CategoryGroup, DanmakuMessage, SearchHit, StreamInfo, Streamer, StreamerPage } from "./types";
+import type {
+  CategoryGroup,
+  DanmakuMessage,
+  SearchHit,
+  StreamInfo,
+  Streamer,
+  StreamerPage,
+} from "./types";
 
 /**
  * B 站后端适配层。
@@ -31,9 +38,7 @@ function toPromise<T>(p: Promise<T>): Promise<T> {
 
 export const bilibiliApi = {
   listCategories(): Promise<CategoryGroup[]> {
-    return toPromise(Bilibili.FetchCategories()).then((list) =>
-      (list ?? []).map(mapCategoryGroup),
-    );
+    return toPromise(Bilibili.FetchCategories()).then((list) => (list ?? []).map(mapCategoryGroup));
   },
 
   listStreamers(cateId: string, page = 1): Promise<StreamerPage> {
@@ -72,6 +77,7 @@ export const bilibiliApi = {
       (id) => toPromise(Bilibili.StartDanmaku(id)),
       (id) => toPromise(Bilibili.StopDanmaku(id)),
       onMessage,
+      "bilibili",
     );
   },
 };

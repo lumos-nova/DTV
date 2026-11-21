@@ -38,6 +38,14 @@ export interface UseXgPlayerResult {
   pipActive: boolean;
   /** 进入 / 退出画中画小窗 */
   togglePip: () => void;
+  audioBoostSupported: boolean;
+  activateAudioBoost: () => boolean;
+}
+
+export interface PlayerAudioState {
+  /** 0–2; values above 1 use Web Audio gain processing. */
+  volume: number;
+  muted: boolean;
 }
 
 const DEFAULT_VOLUME = 0.7;
@@ -94,6 +102,7 @@ export function useXgPlayer(
   containerRef: React.RefObject<HTMLDivElement | null>,
   source: PlayerSource | null,
   isLive = true,
+  audio?: PlayerAudioState,
 ): UseXgPlayerResult {
   const playerRef = useRef<Player | null>(null);
   const [state, setState] = useState<PlayState>("idle");
@@ -103,10 +112,46 @@ export function useXgPlayer(
   const lastVolumeRef = useRef(volume > 0 ? volume : DEFAULT_VOLUME);
   const [pipSupported, setPipSupported] = useState(false);
   const [pipActive, setPipActive] = useState(false);
+  const [audioBoostSupported, setAudioBoostSupported] = useState(true);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioGainRef = useRef<GainNode | null>(null);
+  const audioSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const audioRef = useRef(audio);
+  audioRef.current = audio;
 
   const url = source?.url ?? "";
   const format = source?.format ?? "hls";
   const sourceNonce = source?.nonce ?? 0;
+
+  const activateAudioBoost = useCallback(() => {
+    const media = playerRef.current?.media as HTMLMediaElement | null;
+    if (!media) return false;
+    try {
+      if (!audioGainRef.current) {
+        const audioContext = new AudioContext();
+        const audioSource = audioContext.createMediaElementSource(media);
+        const gain = audioContext.createGain();
+        audioSource.connect(gain);
+        gain.connect(audioContext.destination);
+        audioContextRef.current = audioContext;
+        audioSourceRef.current = audioSource;
+        audioGainRef.current = gain;
+      }
+      const audioContext = audioContextRef.current;
+      if (audioContext?.state === "suspended") {
+        void audioContext.resume().catch((error: unknown) => {
+          console.warn("[player] 音频上下文恢复失败", error);
+          setAudioBoostSupported(false);
+        });
+      }
+      setAudioBoostSupported(true);
+      return true;
+    } catch (error) {
+      console.warn("[player] 音量增强初始化失败", error);
+      setAudioBoostSupported(false);
+      return false;
+    }
+  }, []);
 
   /** 真正写实例音量 + 持久化 */
   const applyVolume = useCallback((next: number) => {
@@ -167,8 +212,13 @@ export function useXgPlayer(
         autoplay: true,
         controls: false,
         lang: "zh",
-        volume,
-        autoplayMuted: false,
+        volume: Math.min(audioRef.current?.volume ?? volume, 1),
+        autoplayMuted: audioRef.current?.muted ?? false,
+        ...(audioRef.current
+          ? {
+              videoAttributes: { crossOrigin: "anonymous" },
+            }
+          : {}),
         closeVideoClick: true,
         closeVideoDblclick: false,
         screenShot: false,
@@ -202,6 +252,7 @@ export function useXgPlayer(
 
       const player = new Player(options as unknown as ConstructorParameters<typeof Player>[0]);
       playerRef.current = player;
+      setAudioBoostSupported(true);
 
       player.on("playing", () => {
         setState("playing");
@@ -211,12 +262,8 @@ export function useXgPlayer(
         setState((prev) => (prev === "loading" || prev === "buffering" ? "playing" : prev));
       });
       player.on("pause", () => setState((prev) => (prev === "error" ? prev : "paused")));
-      player.on("waiting", () =>
-        setState((prev) => (prev === "error" ? prev : "buffering")),
-      );
-      player.on("stalled", () =>
-        setState((prev) => (prev === "error" ? prev : "buffering")),
-      );
+      player.on("waiting", () => setState((prev) => (prev === "error" ? prev : "buffering")));
+      player.on("stalled", () => setState((prev) => (prev === "error" ? prev : "buffering")));
       player.on("error", () => {
         if (disposed) return;
         setError("直播流连接中断，正在尝试自动重连。");
@@ -225,6 +272,18 @@ export function useXgPlayer(
       });
 
       const media = player.media as HTMLVideoElement | null;
+      const currentAudio = audioRef.current;
+      if (media && currentAudio) {
+        media.muted = currentAudio.muted;
+        if (currentAudio.volume > 1) {
+          if (activateAudioBoost() && audioGainRef.current) {
+            audioGainRef.current.gain.value = Math.min(2, currentAudio.volume);
+          }
+          media.volume = 1;
+        } else {
+          media.volume = currentAudio.volume;
+        }
+      }
       const syncVideoBox = () => {
         if (disposed || !media) return;
         updateVideoBox(el, media);
@@ -285,6 +344,15 @@ export function useXgPlayer(
 
       const active = playerRef.current;
       const media = active?.media as HTMLVideoElement | null;
+      audioGainRef.current?.disconnect();
+      audioGainRef.current = null;
+      audioSourceRef.current?.disconnect();
+      audioSourceRef.current = null;
+      const audioContext = audioContextRef.current;
+      audioContextRef.current = null;
+      if (audioContext && audioContext.state !== "closed") {
+        void audioContext.close();
+      }
       try {
         active?.pause();
       } catch {
@@ -318,13 +386,36 @@ export function useXgPlayer(
   useEffect(() => {
     const player = playerRef.current;
     if (!player) return;
+    const audioState = audioRef.current;
+    if (audioState) {
+      const media = player.media as HTMLMediaElement | null;
+      if (!media) return;
+      media.muted = audioState.muted;
+      if (audioState.volume > 1) {
+        let gain = audioGainRef.current;
+        if (!gain) {
+          if (!activateAudioBoost()) {
+            media.volume = 1;
+            return;
+          }
+          gain = audioGainRef.current;
+        }
+        if (!gain) return;
+        gain.gain.value = Math.min(2, audioState.volume);
+        media.volume = 1;
+      } else {
+        if (audioGainRef.current) audioGainRef.current.gain.value = 1;
+        media.volume = audioState.volume;
+      }
+      return;
+    }
     player.volume = volume;
     try {
       player.muted = volume === 0;
     } catch {
       /* ignore */
     }
-  }, [url, volume]);
+  }, [activateAudioBoost, audio?.muted, audio?.volume, url, volume]);
 
   const togglePlay = useCallback(() => {
     const player = playerRef.current;
@@ -369,5 +460,7 @@ export function useXgPlayer(
     pipSupported,
     pipActive,
     togglePip,
+    audioBoostSupported,
+    activateAudioBoost,
   };
 }

@@ -50,28 +50,32 @@ var danmakuHeartbeatBytes = []byte{
 	0x0c, 0xa8, 0x0c,
 }
 
-// DanmakuManager 管理"同一时刻只有一个房间"的虎牙弹幕连接。
+// DanmakuManager 按房间管理虎牙弹幕连接。
 type DanmakuManager struct {
-	mu      sync.Mutex
-	session *danmakuSession
-	emit    EmitFunc
-	seq     atomic.Uint64
-	client  *Client
+	mu       sync.Mutex
+	sessions map[string]*danmakuSession
+	refs     map[string]int
+	emit     EmitFunc
+	seq      atomic.Uint64
+	client   *Client
 }
 
 // NewDanmakuManager 创建虎牙弹幕管理器。
 func NewDanmakuManager(emit EmitFunc) *DanmakuManager {
-	return &DanmakuManager{emit: emit, client: NewClient()}
+	return &DanmakuManager{
+		emit:     emit,
+		client:   NewClient(),
+		sessions: make(map[string]*danmakuSession),
+		refs:     make(map[string]int),
+	}
 }
 
-// Start 开始监听指定房间（会先停掉正在监听的房间）。
+// Start 开始监听指定房间；每次调用都会获取一个房间监听引用。
 func (m *DanmakuManager) Start(roomID string) error {
 	trimmed := strings.TrimSpace(roomID)
 	if trimmed == "" {
 		return fmt.Errorf("缺少房间号")
 	}
-
-	m.stopCurrent()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &danmakuSession{
@@ -82,7 +86,14 @@ func (m *DanmakuManager) Start(roomID string) error {
 	}
 
 	m.mu.Lock()
-	m.session = s
+	if _, exists := m.sessions[trimmed]; exists {
+		m.refs[trimmed]++
+		m.mu.Unlock()
+		cancel()
+		return nil
+	}
+	m.sessions[trimmed] = s
+	m.refs[trimmed] = 1
 	m.mu.Unlock()
 
 	go s.run(ctx)
@@ -96,39 +107,42 @@ func (m *DanmakuManager) Start(roomID string) error {
 func (m *DanmakuManager) Stop(roomID string) {
 	trimmed := strings.TrimSpace(roomID)
 	m.mu.Lock()
-	current := m.session
-	if current == nil || (trimmed != "" && current.roomID != trimmed) {
-		m.mu.Unlock()
-		return
+	var stopping []*danmakuSession
+	if trimmed == "" {
+		for key, session := range m.sessions {
+			stopping = append(stopping, session)
+			delete(m.sessions, key)
+			delete(m.refs, key)
+		}
+	} else if current := m.sessions[trimmed]; current != nil {
+		if m.refs[trimmed] > 1 {
+			m.refs[trimmed]--
+			m.mu.Unlock()
+			return
+		}
+		stopping = append(stopping, current)
+		delete(m.sessions, trimmed)
+		delete(m.refs, trimmed)
 	}
-	m.session = nil
 	m.mu.Unlock()
 
-	log.Printf("[Huya Danmaku] 停止监听 room=%s (request=%s)", current.roomID, roomID)
-	current.stop()
+	for _, current := range stopping {
+		log.Printf("[Huya Danmaku] 停止监听 room=%s (request=%s)", current.roomID, roomID)
+		current.stop()
+	}
 }
 
 // StopAll 应用退出时调用。
 func (m *DanmakuManager) StopAll() { m.Stop("") }
 
-// RunningRoom 返回当前监听房间号（空表示未监听）。
+// RunningRoom 返回任意一个当前监听房间号（空表示未监听）。
 func (m *DanmakuManager) RunningRoom() string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.session == nil {
-		return ""
+	for roomID := range m.sessions {
+		return roomID
 	}
-	return m.session.roomID
-}
-
-func (m *DanmakuManager) stopCurrent() {
-	m.mu.Lock()
-	current := m.session
-	m.session = nil
-	m.mu.Unlock()
-	if current != nil {
-		current.stop()
-	}
+	return ""
 }
 
 func (m *DanmakuManager) emitEvent(roomID string, message common.DanmakuMessage) {

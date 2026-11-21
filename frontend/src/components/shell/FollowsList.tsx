@@ -21,6 +21,7 @@ import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/lib/cn";
 import { useOpenPlayer } from "@/lib/navigation";
 import { PLATFORM_LABEL, type LivePlatform } from "@/api";
+import { FOLLOW_ROOM_DRAG_TYPE } from "@/features/multiview/layout";
 import { followKey, useFollow, type FollowRecord } from "@/state/FollowProvider";
 import { useToast } from "@/state/ToastProvider";
 import styles from "./FollowsList.module.css";
@@ -300,8 +301,12 @@ export function FollowsList({
       setDragFolderId(null);
       setDragOverKey(null);
       setDragOverFolder(null);
-      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.effectAllowed = "copyMove";
       event.dataTransfer.setData("text/plain", key);
+      event.dataTransfer.setData(
+        FOLLOW_ROOM_DRAG_TYPE,
+        JSON.stringify({ platform: record.platform, roomId: record.id }),
+      );
     },
     [folderOf],
   );
@@ -506,14 +511,10 @@ export function FollowsList({
             dragOverKey === key && styles.rowDragOver,
           )}
           draggable={draggable}
-          onDragStart={
-            draggable ? (e) => onRowDragStart(e, record, sourceFolderId) : undefined
-          }
+          onDragStart={draggable ? (e) => onRowDragStart(e, record, sourceFolderId) : undefined}
           onDragEnd={draggable ? onRowDragEnd : undefined}
           onDragOver={draggable ? (e) => onRowDragOver(e, record, opts.inFolderId) : undefined}
-          onDragLeave={
-            draggable ? (e) => onRowDragLeave(e, record, opts.inFolderId) : undefined
-          }
+          onDragLeave={draggable ? (e) => onRowDragLeave(e, record, opts.inFolderId) : undefined}
           onDrop={draggable ? (e) => onRowDrop(e, record, opts.inFolderId) : undefined}
           onMouseEnter={
             opts.listId && !opts.plain
@@ -537,10 +538,7 @@ export function FollowsList({
               <SmoothImage src={record.avatar} alt={record.nickname} rounded />
             </span>
             <span
-              className={cn(
-                styles.liveDot,
-                record.isLive ? styles.liveDotOn : styles.liveDotOff,
-              )}
+              className={cn(styles.liveDot, record.isLive ? styles.liveDotOn : styles.liveDotOff)}
               title={record.isLive ? "正在直播" : "未开播"}
               aria-hidden="true"
             />
@@ -761,9 +759,7 @@ export function FollowsList({
                     <span className={styles.collapsedFolderCount}>{folder.records.length}</span>
                   </button>
                 ))}
-                <ul className={styles.list}>
-                  {topLevel.map((record) => renderRow(record, {}))}
-                </ul>
+                <ul className={styles.list}>{topLevel.map((record) => renderRow(record, {}))}</ul>
               </>
             ) : (
               <ul
@@ -869,7 +865,10 @@ export function FollowsList({
                 <div className={styles.overlayFilters}>
                   <button
                     type="button"
-                    className={cn(styles.overlayFilter, overlayFilter === "ALL" && styles.overlayFilterActive)}
+                    className={cn(
+                      styles.overlayFilter,
+                      overlayFilter === "ALL" && styles.overlayFilterActive,
+                    )}
                     onClick={() => setOverlayFilter("ALL")}
                   >
                     全部
@@ -916,9 +915,7 @@ export function FollowsList({
                       </span>
                       <span className={styles.overlayMeta}>
                         <span className={styles.overlayName}>{record.nickname}</span>
-                        <span className={styles.overlayRoom}>
-                          {record.title || "暂无直播标题"}
-                        </span>
+                        <span className={styles.overlayRoom}>{record.title || "暂无直播标题"}</span>
                       </span>
                     </button>
                   ))}

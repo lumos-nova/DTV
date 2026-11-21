@@ -1,6 +1,6 @@
-import { Check, Github, Link2, MonitorSmartphone, Palette } from "lucide-react";
+import { Check, Github, MonitorSmartphone, Palette } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { PLATFORM_TAB_ORDER, type LivePlatform } from "@/api";
 import { PlatformTabs } from "@/components/shell/PlatformTabs";
 import { SearchBox } from "@/components/shell/SearchBox";
@@ -19,6 +19,7 @@ function platformFromPath(pathname: string, search: string): LivePlatform | null
   if (
     pathname.startsWith("/subscribe") ||
     pathname.startsWith("/custom") ||
+    pathname.startsWith("/add-room") ||
     pathname.startsWith("/monitor")
   ) {
     return null;
@@ -49,7 +50,6 @@ function platformFromPath(pathname: string, search: string): LivePlatform | null
  */
 export function Navbar() {
   const { pathname, search } = useLocation();
-  const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const desktopOS = useDesktopOS();
   const isMac = desktopOS === "darwin" || isMacOS();
@@ -94,21 +94,6 @@ export function Navbar() {
           {platform && <SearchBox platform={platform} />}
 
           <div className={styles.toolGroup}>
-            <button
-              type="button"
-              className={cn(
-                styles.iconBtn,
-                pathname.startsWith("/monitor") && styles.iconBtnActive,
-                styles.noDrag,
-              )}
-              onClick={() => navigate("/monitor")}
-              aria-label="识别直播间链接"
-              aria-current={pathname.startsWith("/monitor") ? "page" : undefined}
-              title="识别直播间链接"
-            >
-              <Link2 size={18} strokeWidth={2} />
-            </button>
-
             <button
               type="button"
               className={cn(styles.iconBtn, styles.noDrag)}
@@ -189,11 +174,7 @@ export function Navbar() {
                             </span>
                           </span>
                           {active && (
-                            <Check
-                              size={13}
-                              strokeWidth={2.8}
-                              className={styles.paletteCheck}
-                            />
+                            <Check size={13} strokeWidth={2.8} className={styles.paletteCheck} />
                           )}
                         </button>
                       );

@@ -9,7 +9,14 @@ import {
   mapStreamer,
   mapStreamerPage,
 } from "./mappers";
-import type { CategoryGroup, DanmakuMessage, SearchHit, StreamInfo, Streamer, StreamerPage } from "./types";
+import type {
+  CategoryGroup,
+  DanmakuMessage,
+  SearchHit,
+  StreamInfo,
+  Streamer,
+  StreamerPage,
+} from "./types";
 
 /**
  * 抖音后端适配层。
@@ -31,9 +38,7 @@ function toPromise<T>(p: Promise<T>): Promise<T> {
 
 export const douyinApi = {
   listCategories(): Promise<CategoryGroup[]> {
-    return toPromise(Douyin.FetchCategories()).then((list) =>
-      (list ?? []).map(mapCategoryGroup),
-    );
+    return toPromise(Douyin.FetchCategories()).then((list) => (list ?? []).map(mapCategoryGroup));
   },
 
   listStreamers(cateId: string, page = 1): Promise<StreamerPage> {
@@ -90,6 +95,7 @@ export const douyinApi = {
       (id) => toPromise(Douyin.StartDanmaku(id)),
       (id) => toPromise(Douyin.StopDanmaku(id)),
       onMessage,
+      "douyin",
     );
   },
 };

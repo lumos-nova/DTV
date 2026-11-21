@@ -112,7 +112,7 @@ func (s *HuyaService) GetStreamURL(roomID string, quality string, line string) (
 	return url, nil
 }
 
-// StartDanmaku 开始监听某房间弹幕（会先停掉上一个房间）。
+// StartDanmaku 开始监听某房间弹幕；与其它房间的监听互不影响。
 func (s *HuyaService) StartDanmaku(roomID string) error {
 	if err := s.danmaku.Start(roomID); err != nil {
 		log.Printf("[HuyaService] 启动弹幕失败 room=%s: %v", roomID, err)
@@ -127,7 +127,7 @@ func (s *HuyaService) StopDanmaku(roomID string) error {
 	return nil
 }
 
-// RunningDanmakuRoom 返回当前监听房间号（空表示未监听）。
+// RunningDanmakuRoom 返回任意一个当前监听房间号（空表示没有监听）。
 func (s *HuyaService) RunningDanmakuRoom() string {
 	return s.danmaku.RunningRoom()
 }

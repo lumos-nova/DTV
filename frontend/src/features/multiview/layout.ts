@@ -1,0 +1,198 @@
+import type { LivePlatform } from "@/api";
+
+export interface MonitorGridSize {
+  columns: 1 | 2 | 3 | 4;
+  rows: 1 | 2 | 3 | 4;
+}
+
+export interface MonitorTileSize {
+  columns: 1 | 2 | 3 | 4;
+  rows: 1 | 2 | 3 | 4;
+}
+
+export interface MonitorRoom {
+  key: string;
+  platform: LivePlatform;
+  roomId: string;
+  size: MonitorTileSize;
+  volume: number;
+  danmakuEnabled: boolean;
+}
+
+export interface GridPlacement {
+  column: number;
+  row: number;
+  columns: number;
+  rows: number;
+}
+
+const MAX_GRID_SIZE = 4;
+const MAX_ROOMS = 16;
+
+export const MONITOR_ROOM_DRAG_TYPE = "application/x-dtv-monitor-room";
+export const FOLLOW_ROOM_DRAG_TYPE = "application/x-dtv-follow-room";
+
+export function swapRoomPositionsAndSizes(
+  rooms: readonly MonitorRoom[],
+  fromKey: string,
+  toKey: string,
+): MonitorRoom[] {
+  const next = [...rooms];
+  const fromIndex = next.findIndex((room) => room.key === fromKey);
+  const toIndex = next.findIndex((room) => room.key === toKey);
+  const from = next[fromIndex];
+  const to = next[toIndex];
+  if (!from || !to || fromIndex === toIndex) return next;
+
+  next[fromIndex] = { ...to, size: from.size };
+  next[toIndex] = { ...from, size: to.size };
+  return next;
+}
+
+function isRoomSize(value: unknown): value is MonitorTileSize {
+  if (!value || typeof value !== "object") return false;
+  const size = value as Record<string, unknown>;
+  const validSizes = [1, 2, 3, 4];
+  return validSizes.includes(size.columns as number) && validSizes.includes(size.rows as number);
+}
+
+export function packRoomGrid(
+  rooms: readonly MonitorRoom[],
+  grid: MonitorGridSize,
+): Map<string, GridPlacement> | null {
+  const occupied = Array.from({ length: grid.rows }, () =>
+    Array.from({ length: grid.columns }, () => false),
+  );
+  const placements = new Map<string, GridPlacement>();
+
+  for (const room of rooms) {
+    if (room.size.columns > grid.columns || room.size.rows > grid.rows) return null;
+    const columns = room.size.columns;
+    const rows = room.size.rows;
+    let placement: GridPlacement | null = null;
+
+    for (let row = 0; row <= grid.rows - rows && !placement; row += 1) {
+      for (let column = 0; column <= grid.columns - columns; column += 1) {
+        let free = true;
+        for (let y = row; y < row + rows && free; y += 1) {
+          for (let x = column; x < column + columns; x += 1) {
+            if (occupied[y]?.[x]) {
+              free = false;
+              break;
+            }
+          }
+        }
+        if (free) {
+          placement = { column: column + 1, row: row + 1, columns, rows };
+          break;
+        }
+      }
+    }
+
+    if (!placement) return null;
+    for (let y = placement.row - 1; y < placement.row - 1 + placement.rows; y += 1) {
+      for (let x = placement.column - 1; x < placement.column - 1 + placement.columns; x += 1) {
+        const row = occupied[y];
+        if (row) row[x] = true;
+      }
+    }
+    placements.set(room.key, placement);
+  }
+
+  return placements;
+}
+
+export function fitRoomGrid(
+  rooms: readonly MonitorRoom[],
+  preferred: MonitorGridSize,
+): MonitorGridSize | null {
+  const candidates: MonitorGridSize[] = [];
+  for (let columns = 1; columns <= MAX_GRID_SIZE; columns += 1) {
+    for (let rows = 1; rows <= MAX_GRID_SIZE; rows += 1) {
+      const candidate = {
+        columns: columns as MonitorGridSize["columns"],
+        rows: rows as MonitorGridSize["rows"],
+      };
+      if (packRoomGrid(rooms, candidate)) candidates.push(candidate);
+    }
+  }
+  candidates.sort((a, b) => {
+    const score = (grid: MonitorGridSize) =>
+      Math.abs(grid.columns - preferred.columns) * 5 + Math.abs(grid.rows - preferred.rows);
+    return score(a) - score(b) || a.rows * a.columns - b.rows * b.columns;
+  });
+  return candidates[0] ?? null;
+}
+
+export function normalizeMonitorWorkspace(raw: unknown): {
+  rooms: MonitorRoom[];
+  grid: MonitorGridSize;
+  globalDanmakuEnabled: boolean;
+  audioFocusKeys: string[];
+} {
+  const source = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const rawGrid =
+    source.grid && typeof source.grid === "object" ? (source.grid as Record<string, unknown>) : {};
+  const grid: MonitorGridSize = {
+    columns:
+      typeof rawGrid.columns === "number" &&
+      rawGrid.columns >= 1 &&
+      rawGrid.columns <= MAX_GRID_SIZE
+        ? (rawGrid.columns as MonitorGridSize["columns"])
+        : 2,
+    rows:
+      typeof rawGrid.rows === "number" && rawGrid.rows >= 1 && rawGrid.rows <= MAX_GRID_SIZE
+        ? (rawGrid.rows as MonitorGridSize["rows"])
+        : 2,
+  };
+  const seen = new Set<string>();
+  const rooms: MonitorRoom[] = [];
+  const platforms: readonly LivePlatform[] = ["douyu", "huya", "douyin", "bilibili"];
+  const rawRooms = Array.isArray(source.rooms) ? source.rooms : [];
+
+  for (const item of rawRooms) {
+    if (!item || typeof item !== "object") continue;
+    const room = item as Record<string, unknown>;
+    const platform = room.platform;
+    const roomId = typeof room.roomId === "string" ? room.roomId : "";
+    if (
+      typeof platform !== "string" ||
+      !platforms.includes(platform as LivePlatform) ||
+      !/^\d+$/.test(roomId)
+    ) {
+      continue;
+    }
+    const key = `${platform}:${roomId}`;
+    if (seen.has(key) || rooms.length >= MAX_ROOMS) continue;
+    seen.add(key);
+    const volume =
+      typeof room.volume === "number" && Number.isFinite(room.volume)
+        ? Math.min(2, Math.max(0, room.volume))
+        : 0.7;
+    rooms.push({
+      key,
+      platform: platform as LivePlatform,
+      roomId,
+      size: isRoomSize(room.size) ? room.size : { columns: 1, rows: 1 },
+      volume,
+      danmakuEnabled: room.danmakuEnabled !== false,
+    });
+  }
+
+  let validGrid = grid;
+  if (!packRoomGrid(rooms, validGrid)) {
+    validGrid = fitRoomGrid(rooms, validGrid) ?? { columns: 4, rows: 4 };
+  }
+  const validKeys = new Set(rooms.map((room) => room.key));
+  const rawAudioKeys = Array.isArray(source.audioFocusKeys) ? source.audioFocusKeys : [];
+  const audioFocusKeys = [
+    ...new Set(rawAudioKeys.filter((key): key is string => typeof key === "string")),
+  ].filter((key) => validKeys.has(key));
+
+  return {
+    rooms,
+    grid: validGrid,
+    globalDanmakuEnabled: source.globalDanmakuEnabled !== false,
+    audioFocusKeys: audioFocusKeys.slice(0, MAX_ROOMS),
+  };
+}

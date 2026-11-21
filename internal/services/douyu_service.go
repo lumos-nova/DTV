@@ -169,7 +169,7 @@ func (s *DouyuService) GetStreamURL(roomID string, quality string, line string) 
 
 // ---------------------------------------------------------------- 弹幕
 
-// StartDanmaku 开始监听某房间的弹幕（会先停掉上一个房间）。
+// StartDanmaku 开始监听某房间的弹幕；与其它房间的监听互不影响。
 //
 // 弹幕通过事件推给前端：`danmaku-message`（全局）与 `danmaku-<roomId>`。
 func (s *DouyuService) StartDanmaku(roomID string) error {
@@ -180,13 +180,13 @@ func (s *DouyuService) StartDanmaku(roomID string) error {
 	return nil
 }
 
-// StopDanmaku 停止弹幕监听（roomID 仅用于日志，实际永远停当前连接）。
+// StopDanmaku 停止指定房间的弹幕监听。
 func (s *DouyuService) StopDanmaku(roomID string) error {
 	s.danmaku.Stop(roomID)
 	return nil
 }
 
-// RunningDanmakuRoom 返回当前正在监听的房间号（空表示未监听）。
+// RunningDanmakuRoom 返回任意一个当前监听房间号（空表示没有监听）。
 func (s *DouyuService) RunningDanmakuRoom() string {
 	return s.danmaku.RunningRoom()
 }

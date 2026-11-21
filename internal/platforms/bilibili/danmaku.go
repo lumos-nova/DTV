@@ -61,15 +61,14 @@ const (
 // 而 zlib 是 Go 标准库自带，不用引第三方 brotli 依赖。
 const danmakuProtover = 2
 
-// DanmakuManager 管理"同一时刻只监听一个房间"的弹幕会话。
-//
-// 与斗鱼/虎牙/抖音的 manager 语义保持一致：切房间会先停掉上一个。
+// DanmakuManager 按房间管理 B 站弹幕会话。
 type DanmakuManager struct {
 	emit EmitFunc
 
-	mu      sync.Mutex
-	current *danmakuSession
-	seq     int64
+	mu       sync.Mutex
+	sessions map[string]*danmakuSession
+	refs     map[string]int
+	seq      int64
 }
 
 // NewDanmakuManager 构造。
@@ -77,27 +76,37 @@ func NewDanmakuManager(emit EmitFunc) *DanmakuManager {
 	if emit == nil {
 		emit = func(string, any) {}
 	}
-	return &DanmakuManager{emit: emit}
+	return &DanmakuManager{
+		emit:     emit,
+		sessions: make(map[string]*danmakuSession),
+		refs:     make(map[string]int),
+	}
 }
 
-// RunningRoom 返回当前正在监听的房间号，没有则为空串。
+// RunningRoom 返回任意一个正在监听的房间号，没有则为空串。
 func (m *DanmakuManager) RunningRoom() string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.current == nil {
-		return ""
+	for roomID := range m.sessions {
+		return roomID
 	}
-	return m.current.roomID
+	return ""
 }
 
-// Start 开始监听某个房间（会先停掉上一个）。
+// Start 开始监听某个房间；每次调用都会获取一个房间监听引用。
 func (m *DanmakuManager) Start(roomID string) error {
 	text := NormalizeRoomID(roomID)
 	if text == "" {
 		return fmt.Errorf("房间号为空")
 	}
 
-	m.StopAll()
+	m.mu.Lock()
+	if _, exists := m.sessions[text]; exists {
+		m.refs[text]++
+		m.mu.Unlock()
+		return nil
+	}
+	m.mu.Unlock()
 
 	session, err := newDanmakuSession(m, text)
 	if err != nil {
@@ -105,7 +114,14 @@ func (m *DanmakuManager) Start(roomID string) error {
 	}
 
 	m.mu.Lock()
-	m.current = session
+	if _, exists := m.sessions[text]; exists {
+		m.refs[text]++
+		m.mu.Unlock()
+		session.cancel()
+		return nil
+	}
+	m.sessions[text] = session
+	m.refs[text] = 1
 	m.mu.Unlock()
 
 	go session.run()
@@ -114,32 +130,39 @@ func (m *DanmakuManager) Start(roomID string) error {
 
 // Stop 停止指定房间（roomID 不为空时只停那个）。
 func (m *DanmakuManager) Stop(roomID string) {
-	m.mu.Lock()
-	session := m.current
-	if session != nil && roomID != "" && session.roomID != NormalizeRoomID(roomID) {
-		m.mu.Unlock()
+	raw := strings.TrimSpace(roomID)
+	text := NormalizeRoomID(roomID)
+	if raw != "" && text == "" {
 		return
 	}
-	if session != nil {
-		m.current = nil
+	m.mu.Lock()
+	var stopping []*danmakuSession
+	if raw == "" {
+		for key, session := range m.sessions {
+			stopping = append(stopping, session)
+			delete(m.sessions, key)
+			delete(m.refs, key)
+		}
+	} else if session := m.sessions[text]; session != nil {
+		if m.refs[text] > 1 {
+			m.refs[text]--
+			m.mu.Unlock()
+			return
+		}
+		stopping = append(stopping, session)
+		delete(m.sessions, text)
+		delete(m.refs, text)
 	}
 	m.mu.Unlock()
 
-	if session != nil {
+	for _, session := range stopping {
 		session.stop()
 	}
 }
 
 // StopAll 停止所有监听。
 func (m *DanmakuManager) StopAll() {
-	m.mu.Lock()
-	session := m.current
-	m.current = nil
-	m.mu.Unlock()
-
-	if session != nil {
-		session.stop()
-	}
+	m.Stop("")
 }
 
 // nextMessageID 生成稳定递增的消息 id。

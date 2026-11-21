@@ -8,7 +8,14 @@ import {
   mapStreamer,
   mapStreamerPage,
 } from "./mappers";
-import type { CategoryGroup, DanmakuMessage, SearchHit, StreamInfo, Streamer, StreamerPage } from "./types";
+import type {
+  CategoryGroup,
+  DanmakuMessage,
+  SearchHit,
+  StreamInfo,
+  Streamer,
+  StreamerPage,
+} from "./types";
 
 /**
  * 虎牙后端适配层。
@@ -31,9 +38,7 @@ function toPromise<T>(p: Promise<T>): Promise<T> {
 export const huyaApi = {
   listCategories(): Promise<CategoryGroup[]> {
     // 分区是 Go 侧 embed 的静态表，结构与斗鱼一致，复用同一套映射
-    return toPromise(Huya.FetchCategories()).then((list) =>
-      (list ?? []).map(mapCategoryGroup),
-    );
+    return toPromise(Huya.FetchCategories()).then((list) => (list ?? []).map(mapCategoryGroup));
   },
 
   listStreamers(gid: string, page = 1): Promise<StreamerPage> {
@@ -67,6 +72,7 @@ export const huyaApi = {
       (id) => toPromise(Huya.StartDanmaku(id)),
       (id) => toPromise(Huya.StopDanmaku(id)),
       onMessage,
+      "huya",
     );
   },
 };
