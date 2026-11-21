@@ -1,5 +1,5 @@
 import { Check, Grid2X2 } from "lucide-react";
-import { useMemo, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { PLATFORM_LABEL, type LivePlatform } from "@/api";
 import { RoomTile } from "@/features/multiview/RoomTile";
 import { DEFAULT_DANMU_SETTINGS } from "@/features/player/danmuSettings";
@@ -38,6 +38,12 @@ export function MonitorPage() {
   const [notice, setNotice] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const placements = useMemo(() => packRoomGrid(rooms, grid), [grid, rooms]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(""), 500);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
 
   const addRoom = (platform: LivePlatform, rawRoomId: string) => {
     const roomId = rawRoomId.replace(/^0+(?=\d)/, "");

@@ -1,6 +1,4 @@
 import {
-  Check,
-  ChevronDown,
   Maximize,
   Maximize2,
   MessageSquare,
@@ -16,9 +14,10 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { LineOption, StreamVariant } from "@/api";
 import { cn } from "@/lib/cn";
+import { ControlsDropdown } from "./ControlsDropdown";
 import { DanmuBlockControl } from "./DanmuBlockControl";
 import { DanmuSettingsControl } from "./DanmuSettingsControl";
 import { VolumeSlider } from "./VolumeSlider";
@@ -80,123 +79,6 @@ interface PlayerControlsProps {
   onHoverChange?: (hovering: boolean) => void;
 }
 
-/* ------------------------------------------------------------------ 下拉选择 */
-
-interface MenuOption {
-  id: string;
-  label: string;
-}
-
-function ControlsDropdown({
-  label,
-  valueId,
-  valueLabel,
-  options,
-  onSelect,
-  onOpenChange,
-}: {
-  label: string;
-  valueId: string;
-  valueLabel: string;
-  options: MenuOption[];
-  onSelect: (id: string) => void;
-  onOpenChange?: (open: boolean) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const closeTimerRef = useRef<number | null>(null);
-
-  const cancelClose = useCallback(() => {
-    if (closeTimerRef.current != null) {
-      window.clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
-  }, []);
-
-  const scheduleClose = useCallback(() => {
-    cancelClose();
-    closeTimerRef.current = window.setTimeout(() => {
-      closeTimerRef.current = null;
-      setOpen(false);
-    }, 220);
-  }, [cancelClose]);
-
-  useEffect(() => {
-    return () => cancelClose();
-  }, [cancelClose]);
-
-  useEffect(() => {
-    onOpenChange?.(open);
-    if (!open) return;
-    const onDown = (event: MouseEvent) => {
-      if (!wrapRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    // 捕获阶段：xgplayer 的全局键盘插件会在 document 上 stopPropagation，
-    // 冒泡阶段收不到 Escape，下拉菜单就关不掉。
-    window.addEventListener("keydown", onKey, true);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      window.removeEventListener("keydown", onKey, true);
-    };
-  }, [open, onOpenChange]);
-
-  if (options.length <= 1) {
-    return (
-      <span className={styles.staticControl}>
-        <span>{valueLabel}</span>
-      </span>
-    );
-  }
-
-  return (
-    <div
-      className={styles.menuWrap}
-      ref={wrapRef}
-      onMouseEnter={() => {
-        cancelClose();
-        setOpen(true);
-      }}
-      onMouseLeave={scheduleClose}
-    >
-      <button
-        type="button"
-        className={cn(styles.controlItem, open && styles.menuOpen)}
-        onClick={() => setOpen((value) => !value)}
-        aria-label={`${label}：${valueLabel}`}
-        aria-haspopup="menu"
-        aria-expanded={open}
-      >
-        <span>{valueLabel}</span>
-        <ChevronDown size={10} className={cn(styles.caret, open && styles.caretOpen)} />
-      </button>
-      {open && (
-        <div className={styles.dropdown} role="menu" aria-label={label}>
-          {options.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              role="menuitemradio"
-              aria-checked={option.id === valueId}
-              className={cn(styles.dropdownItem, option.id === valueId && styles.dropdownItemActive)}
-              onClick={() => {
-                onSelect(option.id);
-                setOpen(false);
-              }}
-            >
-              <span>{option.label}</span>
-              {option.id === valueId && <Check size={12} strokeWidth={1.8} />}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 /* ---------------------------------------------------------------- 控制条本体 */
 
 /**
@@ -211,9 +93,7 @@ export function PlayerControls(props: PlayerControlsProps) {
   const muted = props.volume === 0;
 
   const qualityLabel =
-    props.qualityLabel ??
-    props.qualities.find((q) => q.id === props.qualityId)?.label ??
-    "原画";
+    props.qualityLabel ?? props.qualities.find((q) => q.id === props.qualityId)?.label ?? "原画";
   const lineLabel = props.lines.find((l) => l.id === props.lineId)?.label ?? "线路";
 
   const VolumeIcon = muted ? VolumeX : props.volume < 0.5 ? Volume1 : Volume2;
@@ -266,11 +146,7 @@ export function PlayerControls(props: PlayerControlsProps) {
             aria-label="重新加载"
             title="刷新"
           >
-            <RotateCw
-              size={19}
-              strokeWidth={2}
-              className={cn(loading && styles.spinning)}
-            />
+            <RotateCw size={19} strokeWidth={2} className={cn(loading && styles.spinning)} />
           </button>
 
           <div className={styles.volumeControl}>
@@ -300,10 +176,7 @@ export function PlayerControls(props: PlayerControlsProps) {
             {/* 弹幕开关：图标按钮，按下（开启）时用强调色高亮 */}
             <button
               type="button"
-              className={cn(
-                styles.iconControl,
-                props.danmuEnabled && styles.iconControlActive,
-              )}
+              className={cn(styles.iconControl, props.danmuEnabled && styles.iconControlActive)}
               onClick={props.onToggleDanmu}
               aria-pressed={props.danmuEnabled}
               aria-label={props.danmuEnabled ? "关闭弹幕" : "开启弹幕"}

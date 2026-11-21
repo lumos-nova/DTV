@@ -140,12 +140,18 @@
   color: rgba(255, 255, 255, 0.82);
 }
 
-.playbackControls,
+.playbackControls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 12px;
+}
+
 .roomControls {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 5px;
+  gap: 10px;
 }
 
 .iconButton:hover,
@@ -163,40 +169,6 @@
   color: #a7f3d0;
 }
 
-.qualityControl {
-  position: relative;
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  color: rgba(255, 255, 255, 0.88);
-  cursor: pointer;
-  transition: color 0.2s ease;
-}
-
-.qualityControl:hover {
-  color: #fff;
-}
-
-.qualityControl select {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.qualityControl select:disabled {
-  cursor: not-allowed;
-}
-
-.qualityControl:has(select:disabled) {
-  opacity: 0.4;
-}
-
 .refreshing svg {
   animation: rotate 900ms linear infinite;
 }
@@ -209,10 +181,31 @@
 
 .footer {
   inset: auto 0 0;
-  min-height: 36px;
-  gap: 5px;
-  padding: 5px 8px;
-  background: linear-gradient(0deg, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.28));
+  min-height: 54px;
+  gap: 12px;
+  padding: 10px 14px 12px;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.3), transparent);
+}
+
+.footer .iconButton {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: rgba(255, 255, 255, 0.88);
+  cursor: pointer;
+}
+
+.footer .iconButton:hover {
+  background: none;
+  color: #fff;
+}
+
+.footer .activeButton,
+.footer .activeButton:hover {
+  background: none;
+  color: var(--player-accent);
 }
 
 .volumeControl {
@@ -220,21 +213,19 @@
   flex: 1;
   min-width: 0;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
+  padding-left: 6px;
   color: rgba(255, 255, 255, 0.82);
 }
 
-.volumeControl input {
-  width: 100%;
-  min-width: 30px;
-  height: 16px;
-  accent-color: var(--accent);
+.volumeSlider {
+  --volume-slider-width: 96px;
 }
 
 .volumeValue {
-  width: 32px;
-  color: #fff;
-  font-size: 10px;
+  min-width: 36px;
+  color: var(--player-accent);
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
@@ -382,32 +373,41 @@
     width: 23px;
   }
 
-  .footer,
   .playbackControls,
   .roomControls {
     gap: 2px;
   }
 
   .footer {
-    padding: 4px;
+    gap: 4px;
+    padding: 6px 5px 8px;
+  }
+
+  .footer .iconButton {
+    width: 24px;
+    height: 26px;
+  }
+
+  .footer .iconButton svg {
+    width: 16px;
+    height: 16px;
   }
 
   .volumeControl {
     gap: 3px;
+    padding-left: 0;
+  }
+
+  .volumeControl > svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .volumeSlider {
+    --volume-slider-width: 34px;
   }
 
   .volumeValue {
-    width: 27px;
+    display: none;
   }
-}
-
-.visuallyHidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
 }

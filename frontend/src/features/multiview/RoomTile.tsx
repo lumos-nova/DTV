@@ -5,7 +5,6 @@ import {
   Pause,
   Play,
   RotateCw,
-  Gauge,
   Volume2,
   VolumeX,
   X,
@@ -15,6 +14,8 @@ import { api, PLATFORM_LABEL, PLATFORM_LOGO, type DanmakuMessage, type StreamInf
 import { DanmuOverlay } from "@/features/player/DanmuOverlay";
 import { DanmuSettingsControl } from "@/features/player/DanmuSettingsControl";
 import type { DanmuUserSettings } from "@/features/player/danmuSettings";
+import { ControlsDropdown } from "@/features/player/ControlsDropdown";
+import { VolumeSlider } from "@/features/player/VolumeSlider";
 import { useXgPlayer } from "@/features/player/useXgPlayer";
 import { cn } from "@/lib/cn";
 import {
@@ -235,7 +236,7 @@ export function RoomTile({
         if (event.button !== 0) return;
         if (
           target instanceof Element &&
-          target.closest("button, input, select, label, [draggable='true']")
+          target.closest("button, input, select, label, [role='slider'], [draggable='true']")
         )
           return;
         onAudioFocus(room.key, event.shiftKey);
@@ -331,7 +332,11 @@ export function RoomTile({
               title={player.state === "paused" ? "继续播放" : "暂停"}
               aria-label={player.state === "paused" ? "继续播放" : "暂停"}
             >
-              {player.state === "paused" ? <Play size={15} /> : <Pause size={15} />}
+              {player.state === "paused" ? (
+                <Play size={22} strokeWidth={2} fill="currentColor" />
+              ) : (
+                <Pause size={22} strokeWidth={2} fill="currentColor" />
+              )}
             </button>
             <button
               type="button"
@@ -343,27 +348,24 @@ export function RoomTile({
               title="刷新直播"
               aria-label="刷新直播"
             >
-              <RotateCw size={15} />
+              <RotateCw size={19} strokeWidth={2} />
             </button>
           </div>
-          <label className={styles.volumeControl}>
-            <Volume2 size={14} aria-hidden="true" />
-            <span className={styles.visuallyHidden}>房间音量</span>
-            <input
-              type="range"
-              min="0"
-              max="200"
-              step="5"
-              value={Math.round(room.volume * 100)}
-              onChange={(event) => {
-                const volume = Number(event.target.value) / 100;
+          <div className={styles.volumeControl}>
+            <Volume2 size={19} aria-hidden="true" />
+            <VolumeSlider
+              className={styles.volumeSlider}
+              label="房间音量"
+              value={room.volume}
+              max={2}
+              step={0.05}
+              onChange={(volume) => {
                 if (volume > 1) player.activateAudioBoost();
                 onVolumeChange(room.key, volume);
               }}
-              aria-valuetext={`${Math.round(room.volume * 100)}%`}
             />
             <span className={styles.volumeValue}>{Math.round(room.volume * 100)}%</span>
-          </label>
+          </div>
           {room.volume > 1 && !player.audioBoostSupported && (
             <span className={styles.boostWarning} role="status">
               增强不可用
@@ -381,7 +383,7 @@ export function RoomTile({
               title={focused ? "当前有声；Shift 点击可多选" : "设为音频焦点；Shift 点击可多选"}
               aria-label={focused ? "音频焦点已开启" : "设为音频焦点"}
             >
-              {focused ? <Volume2 size={15} /> : <VolumeX size={15} />}
+              {focused ? <Volume2 size={18} /> : <VolumeX size={18} />}
             </button>
             <button
               type="button"
@@ -391,32 +393,23 @@ export function RoomTile({
               title={room.danmakuEnabled ? "关闭本房间弹幕" : "开启本房间弹幕"}
               aria-label={room.danmakuEnabled ? "关闭本房间弹幕" : "开启本房间弹幕"}
             >
-              {room.danmakuEnabled ? <MessageSquare size={15} /> : <MessageSquareOff size={15} />}
+              {room.danmakuEnabled ? <MessageSquare size={18} /> : <MessageSquareOff size={18} />}
             </button>
             <DanmuSettingsControl
               settings={room.danmakuSettings}
               onChange={(patch) => onDanmakuSettingsChange(room.key, patch)}
               supportsColor={["douyu", "huya", "bilibili"].includes(room.platform)}
             />
-            <label
-              className={styles.qualityControl}
-              title={`清晰度：${variant?.label ?? "不可用"}`}
-            >
-              <span className={styles.visuallyHidden}>清晰度</span>
-              <Gauge size={16} aria-hidden="true" />
-              <select
-                value={variant?.id ?? ""}
-                disabled={!info?.isLive || info.variants.length < 2}
-                onChange={(event) => onQualityChange(room.key, event.target.value)}
-                aria-label="直播清晰度"
-              >
-                {info?.variants.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <ControlsDropdown
+              label="清晰度"
+              valueId={variant?.id ?? ""}
+              valueLabel={variant?.label ?? "清晰度"}
+              options={(info?.variants ?? []).map((item) => ({
+                id: item.id,
+                label: item.label,
+              }))}
+              onSelect={(qualityId) => onQualityChange(room.key, qualityId)}
+            />
           </div>
         </footer>
         <button

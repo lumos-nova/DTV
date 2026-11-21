@@ -2,20 +2,20 @@ import { useCallback, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import styles from "./VolumeSlider.module.css";
 
-/** 键盘微调步长（百分比） */
-const STEP = 5;
-/** Home / End 之外的粗调步长 */
-const PAGE_STEP = 10;
+const KEYBOARD_STEP = 0.05;
+const PAGE_STEP = 0.1;
 
 interface VolumeSliderProps {
-  /** 0 ~ 1 */
+  /** 0 ~ max */
   value: number;
   onChange: (value: number) => void;
+  max?: number;
+  step?: number;
   className?: string;
   label?: string;
 }
 
-const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+const clamp = (value: number, max: number) => Math.min(max, Math.max(0, value));
 
 /**
  * 音量条：没有拖动手柄，按住滑条左右滑就行。
@@ -24,14 +24,23 @@ const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
  * 足够表达"当前音量"。交互上整条都是热区（高 18px，比 4px 的轨道好点），
  * 按下即跳转到该位置并开始拖动；松手、指针离开、失焦都会结束拖动。
  *
- * 键盘可访问：←/→ 微调 5%，PageUp/PageDown 调 10%，Home/End 到 0/100%。
+ * 键盘可访问：方向键微调 5%，PageUp/PageDown 调 10%，Home/End 到范围端点。
  */
-export function VolumeSlider({ value, onChange, className, label = "音量" }: VolumeSliderProps) {
+export function VolumeSlider({
+  value,
+  onChange,
+  max = 1,
+  step = max / 100,
+  className,
+  label = "音量",
+}: VolumeSliderProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
   const [hovering, setHovering] = useState(false);
 
-  const percent = Math.round(clamp01(value) * 100);
+  const clampedValue = clamp(value, max);
+  const percent = Math.round(clampedValue * 100);
+  const fillPercent = Math.round((clampedValue / max) * 100);
 
   const applyFromClientX = useCallback(
     (clientX: number) => {
@@ -39,10 +48,12 @@ export function VolumeSlider({ value, onChange, className, label = "音量" }: V
       if (!el) return;
       const rect = el.getBoundingClientRect();
       if (rect.width <= 0) return;
-      // 取整到 1%：既避免"拖不动"的浮点抖动，也让百分比数字稳定
-      onChange(Math.round(clamp01((clientX - rect.left) / rect.width) * 100) / 100);
+      // 按调用方步长取整，避免浮点抖动并让数值稳定
+      const rawValue = clamp(((clientX - rect.left) / rect.width) * max, max);
+      const steppedValue = Math.round(rawValue / step) * step;
+      onChange(Number(clamp(steppedValue, max).toFixed(2)));
     },
-    [onChange],
+    [max, onChange, step],
   );
 
   const onPointerDown = useCallback(
@@ -82,36 +93,36 @@ export function VolumeSlider({ value, onChange, className, label = "音量" }: V
 
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
-      const current = clamp01(value);
+      const current = clamp(value, max);
       let next: number | null = null;
       switch (event.key) {
         case "ArrowLeft":
         case "ArrowDown":
-          next = current - STEP / 100;
+          next = current - max * KEYBOARD_STEP;
           break;
         case "ArrowRight":
         case "ArrowUp":
-          next = current + STEP / 100;
+          next = current + max * KEYBOARD_STEP;
           break;
         case "PageDown":
-          next = current - PAGE_STEP / 100;
+          next = current - max * PAGE_STEP;
           break;
         case "PageUp":
-          next = current + PAGE_STEP / 100;
+          next = current + max * PAGE_STEP;
           break;
         case "Home":
           next = 0;
           break;
         case "End":
-          next = 1;
+          next = max;
           break;
         default:
           return;
       }
       event.preventDefault();
-      onChange(Math.round(clamp01(next) * 100) / 100);
+      onChange(Number(clamp(Math.round(next / step) * step, max).toFixed(2)));
     },
-    [onChange, value],
+    [max, onChange, step, value],
   );
 
   return (
@@ -127,7 +138,7 @@ export function VolumeSlider({ value, onChange, className, label = "音量" }: V
       tabIndex={0}
       aria-label={label}
       aria-valuemin={0}
-      aria-valuemax={100}
+      aria-valuemax={Math.round(max * 100)}
       aria-valuenow={percent}
       aria-valuetext={`${percent}%`}
       title={`${label} ${percent}%（按住左右拖动）`}
@@ -143,7 +154,7 @@ export function VolumeSlider({ value, onChange, className, label = "音量" }: V
       onKeyDown={onKeyDown}
     >
       <div className={styles.rail}>
-        <div className={styles.fill} style={{ width: `${percent}%` }} />
+        <div className={styles.fill} style={{ width: `${fillPercent}%` }} />
       </div>
     </div>
   );
