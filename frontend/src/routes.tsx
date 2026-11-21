@@ -2,6 +2,7 @@ import { Suspense, lazy } from "react";
 import { Navigate, Route, Routes, useSearchParams } from "react-router-dom";
 import { SignalMark } from "@/components/common/SignalMark";
 import { AppShell } from "@/components/shell/AppShell";
+import { MonitorPage } from "@/screens/MonitorPage";
 import { NotFoundPage } from "@/screens/NotFoundPage";
 import styles from "./routes.module.css";
 /**
@@ -47,6 +48,7 @@ export const ROUTES = {
   douyin: "/douyin",
   bilibili: "/bilibili",
   subscribe: "/subscribe",
+  monitor: "/monitor",
   custom: "/custom",
   player: "/player",
 } as const;
@@ -74,6 +76,7 @@ export function AppRoutes() {
         <Route path="/douyin" element={<HomeRoute />} />
         <Route path="/bilibili" element={<HomeRoute />} />
         <Route path="/subscribe" element={<HomeRoute />} />
+        <Route path="/monitor" element={<MonitorPage />} />
         <Route path="/custom" element={<Navigate to="/subscribe" replace />} />
         <Route
           path="/player"

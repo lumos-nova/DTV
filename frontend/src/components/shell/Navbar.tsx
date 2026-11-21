@@ -1,6 +1,6 @@
-import { Check, Github, MonitorSmartphone, Palette } from "lucide-react";
+import { Check, Github, Link2, MonitorSmartphone, Palette } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { PLATFORM_TAB_ORDER, type LivePlatform } from "@/api";
 import { PlatformTabs } from "@/components/shell/PlatformTabs";
 import { SearchBox } from "@/components/shell/SearchBox";
@@ -16,7 +16,13 @@ type ModalKind = "sync" | null;
 
 /** 当前路由对应的平台；订阅页没有平台上下文（返回 null）。 */
 function platformFromPath(pathname: string, search: string): LivePlatform | null {
-  if (pathname.startsWith("/subscribe") || pathname.startsWith("/custom")) return null;
+  if (
+    pathname.startsWith("/subscribe") ||
+    pathname.startsWith("/custom") ||
+    pathname.startsWith("/monitor")
+  ) {
+    return null;
+  }
   // 播放页跟着房间的平台走（搜索框也按该平台工作）
   if (pathname.startsWith("/player")) {
     const platform = new URLSearchParams(search).get("platform");
@@ -43,6 +49,7 @@ function platformFromPath(pathname: string, search: string): LivePlatform | null
  */
 export function Navbar() {
   const { pathname, search } = useLocation();
+  const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const desktopOS = useDesktopOS();
   const isMac = desktopOS === "darwin" || isMacOS();
@@ -87,6 +94,21 @@ export function Navbar() {
           {platform && <SearchBox platform={platform} />}
 
           <div className={styles.toolGroup}>
+            <button
+              type="button"
+              className={cn(
+                styles.iconBtn,
+                pathname.startsWith("/monitor") && styles.iconBtnActive,
+                styles.noDrag,
+              )}
+              onClick={() => navigate("/monitor")}
+              aria-label="识别直播间链接"
+              aria-current={pathname.startsWith("/monitor") ? "page" : undefined}
+              title="识别直播间链接"
+            >
+              <Link2 size={18} strokeWidth={2} />
+            </button>
+
             <button
               type="button"
               className={cn(styles.iconBtn, styles.noDrag)}
