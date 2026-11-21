@@ -4,12 +4,6 @@
   <p>基于 Wails v3 的跨平台斗鱼、虎牙、抖音、bilibili直播桌面客户端</p>
 </div>
 
-<p align="center">
-  <a href="https://apps.microsoft.com/detail/9mt8kdt169xf?referrer=appbadge&mode=direct">
-    <img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200" alt="Download DTV from Microsoft Store">
-  </a>
-</p>
-
 ## 说明
 
 > 安卓版本：[`dtv_mobile`](https://github.com/chen-zeong/dtv_mobile)
@@ -101,3 +95,4 @@ wails3 task windows:msi WIX_BIN="C:\path\to\wix314"
 - 抖音弹幕参考了[@saermart/DouyinLiveWebFetcher](https://github.com/saermart/DouyinLiveWebFetcher)
 - 虎牙参考了https://github.com/liuchuancong/pure_live https://github.com/ihmily/DouyinLiveRecorder
 - b站弹幕参考了https://github.com/xfgryujk/blivedm
+- dtv-plus是基于 [github.com/chen-zeong/DTV](https://github.com/chen-zeong/DTV) 进行部分功能增加
