@@ -1,4 +1,9 @@
 import type { LivePlatform } from "@/api";
+import {
+  DEFAULT_DANMU_SETTINGS,
+  normalizeDanmuSettings,
+  type DanmuUserSettings,
+} from "../player/danmuSettings";
 
 export interface MonitorGridSize {
   columns: 1 | 2 | 3 | 4;
@@ -17,6 +22,8 @@ export interface MonitorRoom {
   size: MonitorTileSize;
   volume: number;
   danmakuEnabled: boolean;
+  danmakuSettings: DanmuUserSettings;
+  qualityId: string;
 }
 
 export interface GridPlacement {
@@ -127,24 +134,9 @@ export function fitRoomGrid(
 export function normalizeMonitorWorkspace(raw: unknown): {
   rooms: MonitorRoom[];
   grid: MonitorGridSize;
-  globalDanmakuEnabled: boolean;
   audioFocusKeys: string[];
 } {
   const source = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
-  const rawGrid =
-    source.grid && typeof source.grid === "object" ? (source.grid as Record<string, unknown>) : {};
-  const grid: MonitorGridSize = {
-    columns:
-      typeof rawGrid.columns === "number" &&
-      rawGrid.columns >= 1 &&
-      rawGrid.columns <= MAX_GRID_SIZE
-        ? (rawGrid.columns as MonitorGridSize["columns"])
-        : 2,
-    rows:
-      typeof rawGrid.rows === "number" && rawGrid.rows >= 1 && rawGrid.rows <= MAX_GRID_SIZE
-        ? (rawGrid.rows as MonitorGridSize["rows"])
-        : 2,
-  };
   const seen = new Set<string>();
   const rooms: MonitorRoom[] = [];
   const platforms: readonly LivePlatform[] = ["douyu", "huya", "douyin", "bilibili"];
@@ -176,13 +168,16 @@ export function normalizeMonitorWorkspace(raw: unknown): {
       size: isRoomSize(room.size) ? room.size : { columns: 1, rows: 1 },
       volume,
       danmakuEnabled: room.danmakuEnabled !== false,
+      danmakuSettings: normalizeDanmuSettings(
+        room.danmakuSettings && typeof room.danmakuSettings === "object"
+          ? (room.danmakuSettings as Partial<DanmuUserSettings>)
+          : DEFAULT_DANMU_SETTINGS,
+      ),
+      qualityId: typeof room.qualityId === "string" ? room.qualityId.slice(0, 128) : "",
     });
   }
 
-  let validGrid = grid;
-  if (!packRoomGrid(rooms, validGrid)) {
-    validGrid = fitRoomGrid(rooms, validGrid) ?? { columns: 4, rows: 4 };
-  }
+  const validGrid = fitRoomGrid(rooms, { columns: 2, rows: 2 }) ?? { columns: 4, rows: 4 };
   const validKeys = new Set(rooms.map((room) => room.key));
   const rawAudioKeys = Array.isArray(source.audioFocusKeys) ? source.audioFocusKeys : [];
   const audioFocusKeys = [
@@ -192,7 +187,6 @@ export function normalizeMonitorWorkspace(raw: unknown): {
   return {
     rooms,
     grid: validGrid,
-    globalDanmakuEnabled: source.globalDanmakuEnabled !== false,
     audioFocusKeys: audioFocusKeys.slice(0, MAX_ROOMS),
   };
 }

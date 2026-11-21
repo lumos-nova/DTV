@@ -1,8 +1,20 @@
-import { MessageSquare, MessageSquareOff, Move, Volume2, VolumeX, X } from "lucide-react";
+import {
+  MessageSquare,
+  MessageSquareOff,
+  Move,
+  Pause,
+  Play,
+  RotateCw,
+  Gauge,
+  Volume2,
+  VolumeX,
+  X,
+} from "lucide-react";
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { api, PLATFORM_LABEL, PLATFORM_LOGO, type DanmakuMessage, type StreamInfo } from "@/api";
 import { DanmuOverlay } from "@/features/player/DanmuOverlay";
-import { DEFAULT_DANMU_SETTINGS } from "@/features/player/danmuSettings";
+import { DanmuSettingsControl } from "@/features/player/DanmuSettingsControl";
+import type { DanmuUserSettings } from "@/features/player/danmuSettings";
 import { useXgPlayer } from "@/features/player/useXgPlayer";
 import { cn } from "@/lib/cn";
 import {
@@ -20,10 +32,11 @@ interface RoomTileProps {
   room: MonitorRoom;
   placement: GridPlacement;
   focused: boolean;
-  globalDanmakuEnabled: boolean;
   onAudioFocus: (key: string, multiple: boolean) => void;
   onDanmakuToggle: (key: string) => void;
+  onDanmakuSettingsChange: (key: string, patch: Partial<DanmuUserSettings>) => void;
   onVolumeChange: (key: string, volume: number) => void;
+  onQualityChange: (key: string, qualityId: string) => void;
   onRemove: (key: string) => void;
   onMove: (fromKey: string, toKey: string) => void;
   onResize: (key: string, size: MonitorTileSize) => void;
@@ -33,10 +46,11 @@ export function RoomTile({
   room,
   placement,
   focused,
-  globalDanmakuEnabled,
   onAudioFocus,
   onDanmakuToggle,
+  onDanmakuSettingsChange,
   onVolumeChange,
+  onQualityChange,
   onRemove,
   onMove,
   onResize,
@@ -81,7 +95,10 @@ export function RoomTile({
     };
   }, [retryKey, room.platform, room.roomId]);
 
-  const variant = info?.variants[0];
+  const variant =
+    info?.variants.find((item) => item.id === room.qualityId) ??
+    info?.variants.find((item) => item.label.includes("原画")) ??
+    info?.variants[0];
   const source =
     info?.isLive && variant ? { url: variant.url, format: variant.format, nonce: retryKey } : null;
   const player = useXgPlayer(playerHostRef, source, true, { volume: room.volume, muted: !focused });
@@ -157,7 +174,7 @@ export function RoomTile({
   }, [player.errorNonce, player.state]);
 
   useEffect(() => {
-    if (!info?.roomId || !globalDanmakuEnabled || !room.danmakuEnabled) {
+    if (!info?.roomId || !room.danmakuEnabled) {
       setMessages([]);
       messageBufferRef.current = [];
       return;
@@ -178,7 +195,7 @@ export function RoomTile({
       messageBufferRef.current = [];
       unsubscribe();
     };
-  }, [globalDanmakuEnabled, info?.platform, info?.roomId, room.danmakuEnabled]);
+  }, [info?.platform, info?.roomId, room.danmakuEnabled]);
 
   useEffect(() => {
     const tile = tileRef.current;
@@ -203,7 +220,7 @@ export function RoomTile({
   }, [onResize, room.key, room.size.columns, room.size.rows]);
 
   const displayName = info?.nickname || `房间 ${room.roomId}`;
-  const active = globalDanmakuEnabled && room.danmakuEnabled;
+  const active = room.danmakuEnabled;
 
   return (
     <article
@@ -247,7 +264,7 @@ export function RoomTile({
           <DanmuOverlay
             messages={messages}
             enabled={active}
-            settings={DEFAULT_DANMU_SETTINGS}
+            settings={room.danmakuSettings}
             colorfulSupported={["douyu", "huya", "bilibili"].includes(room.platform)}
             platform={room.platform}
           />
@@ -295,29 +312,6 @@ export function RoomTile({
           </div>
           <button
             type="button"
-            className={cn(styles.iconButton, focused && styles.activeButton)}
-            onClick={(event) => {
-              if (room.volume > 1) player.activateAudioBoost();
-              onAudioFocus(room.key, event.shiftKey);
-            }}
-            aria-pressed={focused}
-            title={focused ? "当前有声；Shift 点击可多选" : "设为音频焦点；Shift 点击可多选"}
-            aria-label={focused ? "音频焦点已开启" : "设为音频焦点"}
-          >
-            {focused ? <Volume2 size={15} /> : <VolumeX size={15} />}
-          </button>
-          <button
-            type="button"
-            className={cn(styles.iconButton, room.danmakuEnabled && styles.activeButton)}
-            onClick={() => onDanmakuToggle(room.key)}
-            aria-pressed={room.danmakuEnabled}
-            title={room.danmakuEnabled ? "关闭本房间弹幕" : "开启本房间弹幕"}
-            aria-label={room.danmakuEnabled ? "关闭本房间弹幕" : "开启本房间弹幕"}
-          >
-            {room.danmakuEnabled ? <MessageSquare size={15} /> : <MessageSquareOff size={15} />}
-          </button>
-          <button
-            type="button"
             className={styles.iconButton}
             onClick={() => onRemove(room.key)}
             title="从工作台移除"
@@ -328,6 +322,30 @@ export function RoomTile({
         </header>
 
         <footer className={styles.footer}>
+          <div className={styles.playbackControls}>
+            <button
+              type="button"
+              className={styles.iconButton}
+              onClick={player.togglePlay}
+              disabled={!info?.isLive || player.state === "idle"}
+              title={player.state === "paused" ? "继续播放" : "暂停"}
+              aria-label={player.state === "paused" ? "继续播放" : "暂停"}
+            >
+              {player.state === "paused" ? <Play size={15} /> : <Pause size={15} />}
+            </button>
+            <button
+              type="button"
+              className={cn(
+                styles.iconButton,
+                (player.state === "loading" || player.state === "buffering") && styles.refreshing,
+              )}
+              onClick={() => setRetryKey((key) => key + 1)}
+              title="刷新直播"
+              aria-label="刷新直播"
+            >
+              <RotateCw size={15} />
+            </button>
+          </div>
           <label className={styles.volumeControl}>
             <Volume2 size={14} aria-hidden="true" />
             <span className={styles.visuallyHidden}>房间音量</span>
@@ -351,6 +369,55 @@ export function RoomTile({
               增强不可用
             </span>
           )}
+          <div className={styles.roomControls}>
+            <button
+              type="button"
+              className={cn(styles.iconButton, focused && styles.activeButton)}
+              onClick={(event) => {
+                if (room.volume > 1) player.activateAudioBoost();
+                onAudioFocus(room.key, event.shiftKey);
+              }}
+              aria-pressed={focused}
+              title={focused ? "当前有声；Shift 点击可多选" : "设为音频焦点；Shift 点击可多选"}
+              aria-label={focused ? "音频焦点已开启" : "设为音频焦点"}
+            >
+              {focused ? <Volume2 size={15} /> : <VolumeX size={15} />}
+            </button>
+            <button
+              type="button"
+              className={cn(styles.iconButton, room.danmakuEnabled && styles.activeButton)}
+              onClick={() => onDanmakuToggle(room.key)}
+              aria-pressed={room.danmakuEnabled}
+              title={room.danmakuEnabled ? "关闭本房间弹幕" : "开启本房间弹幕"}
+              aria-label={room.danmakuEnabled ? "关闭本房间弹幕" : "开启本房间弹幕"}
+            >
+              {room.danmakuEnabled ? <MessageSquare size={15} /> : <MessageSquareOff size={15} />}
+            </button>
+            <DanmuSettingsControl
+              settings={room.danmakuSettings}
+              onChange={(patch) => onDanmakuSettingsChange(room.key, patch)}
+              supportsColor={["douyu", "huya", "bilibili"].includes(room.platform)}
+            />
+            <label
+              className={styles.qualityControl}
+              title={`清晰度：${variant?.label ?? "不可用"}`}
+            >
+              <span className={styles.visuallyHidden}>清晰度</span>
+              <Gauge size={16} aria-hidden="true" />
+              <select
+                value={variant?.id ?? ""}
+                disabled={!info?.isLive || info.variants.length < 2}
+                onChange={(event) => onQualityChange(room.key, event.target.value)}
+                aria-label="直播清晰度"
+              >
+                {info?.variants.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
         </footer>
         <button
           type="button"

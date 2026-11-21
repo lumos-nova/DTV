@@ -1,30 +1,15 @@
 .page {
+  position: relative;
   display: flex;
   flex: 1;
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
   overflow: hidden;
-  padding: 10px 0 12px;
+  padding: 0 0 12px;
 }
 
-.toolbar {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 16px;
-  min-height: 54px;
-}
-
-.titleGroup {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 10px;
-}
-
-.icon,
 .emptyIcon {
   display: inline-flex;
   flex: 0 0 auto;
@@ -38,90 +23,15 @@
   color: var(--accent-ink);
 }
 
-.title {
-  color: var(--text-primary);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-}
-
-.subtitle {
-  margin-top: 3px;
-  color: var(--text-tertiary);
-  font-size: var(--text-2xs);
-}
-
-.globalDanmaku {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 36px;
-  padding: 0 11px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-  white-space: nowrap;
-}
-
-.globalDanmaku:hover {
-  border-color: var(--border-strong);
-  background: var(--fill-tertiary);
-  color: var(--text-primary);
-}
-
-.toolbarControls {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 6px;
-}
-
-.gridSelect {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--text-tertiary);
-  font-size: var(--text-2xs);
-}
-
-.gridSelect select {
-  width: 40px;
-  height: 32px;
-  padding: 0 4px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  outline: none;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: var(--text-xs);
-}
-
-.gridTimes {
-  color: var(--text-tertiary);
-  font-size: 11px;
-}
-
-.globalDanmaku {
-  height: 32px;
-  padding-inline: 9px;
-}
-
-.globalDanmakuActive {
-  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
-  background: var(--accent-softer);
-  color: var(--accent-ink);
-}
-
 .feedback {
+  position: absolute;
+  z-index: 20;
+  top: 8px;
+  right: 12px;
   display: flex;
-  flex: 0 0 auto;
   align-items: center;
-  min-height: 20px;
-  padding: 0 2px;
+  max-width: min(440px, calc(100% - 24px));
+  pointer-events: none;
 }
 
 .error,
@@ -134,10 +44,18 @@
 
 .error {
   color: var(--danger);
+  background: var(--bg-secondary);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-md);
+  padding: 7px 10px;
 }
 
 .notice {
   color: var(--text-tertiary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 7px 10px;
 }
 
 .empty,
@@ -192,39 +110,7 @@
   background: color-mix(in srgb, var(--accent-softer) 45%, transparent);
 }
 
-@media (max-width: 1080px) {
-  .toolbar {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .titleGroup {
-    margin-right: auto;
-  }
-}
-
 @media (max-width: 650px) {
-  .toolbar {
-    align-items: flex-start;
-  }
-
-  .titleGroup {
-    gap: 7px;
-  }
-
-  .icon {
-    width: 34px;
-    height: 34px;
-  }
-
-  .toolbarControls {
-    gap: 3px;
-  }
-
-  .globalDanmaku span {
-    display: none;
-  }
-
   .grid {
     gap: 5px;
     padding: 4px;

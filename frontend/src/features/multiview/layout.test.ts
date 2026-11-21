@@ -19,6 +19,17 @@ function room(
     size: { columns, rows },
     volume: 0.7,
     danmakuEnabled: true,
+    danmakuSettings: {
+      color: "#ffffff",
+      strokeColor: "#444444",
+      fontSize: "20px",
+      duration: 10000,
+      area: 0.5,
+      mode: "scroll",
+      opacity: 1,
+      colorful: true,
+    },
+    qualityId: "",
   };
 }
 
@@ -37,6 +48,15 @@ describe("monitor layout", () => {
         { columns: 2, rows: 2 },
       ),
     ).toEqual({ columns: 2, rows: 3 });
+  });
+
+  it("resets a legacy oversized grid to the preferred automatic 2×2 layout", () => {
+    const restored = normalizeMonitorWorkspace({
+      grid: { columns: 4, rows: 4 },
+      rooms: [room(1), room(2)],
+    });
+
+    expect(restored.grid).toEqual({ columns: 2, rows: 2 });
   });
 
   it("supports tiles spanning up to four grid cells in either direction", () => {
@@ -67,10 +87,23 @@ describe("monitor layout", () => {
     const state = normalizeMonitorWorkspace({
       grid: { columns: 1, rows: 1 },
       rooms: [...rooms, rooms[0]],
+      globalDanmakuEnabled: false,
       audioFocusKeys: ["douyu:0", "douyu:17"],
     });
     expect(state.rooms).toHaveLength(16);
     expect(state.grid).toEqual({ columns: 4, rows: 4 });
+    expect(state).not.toHaveProperty("globalDanmakuEnabled");
     expect(state.audioFocusKeys).toEqual(["douyu:0"]);
+  });
+
+  it("normalizes persisted room controls and valid danmaku preferences", () => {
+    const restored = normalizeMonitorWorkspace({
+      grid: { columns: 2, rows: 2 },
+      rooms: [{ ...room(1), qualityId: "invalid", danmakuSettings: { opacity: 4 } }],
+    });
+
+    expect(restored.rooms[0]?.qualityId).toBe("invalid");
+    expect(restored.rooms[0]?.danmakuSettings.opacity).toBe(1);
+    expect(restored.rooms[0]?.danmakuSettings.fontSize).toBe("20px");
   });
 });

@@ -1,14 +1,14 @@
-import { Check, Grid2X2, MessageSquare, MessageSquareOff } from "lucide-react";
+import { Check, Grid2X2 } from "lucide-react";
 import { useMemo, useState, type DragEvent } from "react";
 import { PLATFORM_LABEL, type LivePlatform } from "@/api";
 import { RoomTile } from "@/features/multiview/RoomTile";
+import { DEFAULT_DANMU_SETTINGS } from "@/features/player/danmuSettings";
 import {
   FOLLOW_ROOM_DRAG_TYPE,
   fitRoomGrid,
   MONITOR_ROOM_DRAG_TYPE,
   packRoomGrid,
   swapRoomPositionsAndSizes,
-  type MonitorGridSize,
   type MonitorRoom,
   type MonitorTileSize,
 } from "@/features/multiview/layout";
@@ -33,8 +33,7 @@ function droppedLink(event: DragEvent<HTMLElement>): string {
 }
 
 export function MonitorPage() {
-  const { rooms, grid, globalDanmakuEnabled, audioFocusKeys, setWorkspace, setGrid } =
-    useMonitorWorkspace();
+  const { rooms, grid, audioFocusKeys, setWorkspace } = useMonitorWorkspace();
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [dragOver, setDragOver] = useState(false);
@@ -63,6 +62,8 @@ export function MonitorPage() {
         size: { columns: 1, rows: 1 },
         volume: 0.7,
         danmakuEnabled: true,
+        danmakuSettings: { ...DEFAULT_DANMU_SETTINGS },
+        qualityId: "",
       },
     ];
     const nextGrid = fitRoomGrid(nextRooms, grid);
@@ -166,16 +167,6 @@ export function MonitorPage() {
     setError("");
   };
 
-  const handleGridChange = (next: MonitorGridSize) => {
-    if (!packRoomGrid(rooms, next)) {
-      setError("该网格无法容纳当前房间和卡片尺寸，请先移除房间或缩小卡片");
-      setNotice("");
-      return;
-    }
-    setGrid(next);
-    setError("");
-  };
-
   const handleAudioFocus = (key: string, multiple: boolean) => {
     setWorkspace((previous) => {
       if (!multiple) return { ...previous, audioFocusKeys: [key] };
@@ -213,88 +204,21 @@ export function MonitorPage() {
 
   return (
     <section className={styles.page}>
-      <header className={styles.toolbar}>
-        <div className={styles.titleGroup}>
-          <div className={styles.icon} aria-hidden="true">
-            <Grid2X2 size={20} strokeWidth={1.9} />
-          </div>
-          <div>
-            <h1 className={styles.title}>多房间工作台</h1>
-            <p className={styles.subtitle}>
-              {rooms.length}/{MAX_ROOMS} · 拖入关注主播 · Ctrl+滚轮/拖边缘缩放 · Shift+左键切换声音
+      {(error || notice) && (
+        <div className={styles.feedback} aria-live="polite">
+          {error && (
+            <p className={styles.error} role="alert">
+              {error}
             </p>
-          </div>
+          )}
+          {!error && notice && (
+            <p className={styles.notice}>
+              <Check size={13} />
+              {notice}
+            </p>
+          )}
         </div>
-
-        <div className={styles.toolbarControls}>
-          <label className={styles.gridSelect}>
-            <span>列</span>
-            <select
-              value={grid.columns}
-              onChange={(event) =>
-                handleGridChange({
-                  ...grid,
-                  columns: Number(event.target.value) as MonitorGridSize["columns"],
-                })
-              }
-            >
-              {[1, 2, 3, 4].map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </label>
-          <span className={styles.gridTimes}>×</span>
-          <label className={styles.gridSelect}>
-            <span>行</span>
-            <select
-              value={grid.rows}
-              onChange={(event) =>
-                handleGridChange({
-                  ...grid,
-                  rows: Number(event.target.value) as MonitorGridSize["rows"],
-                })
-              }
-            >
-              {[1, 2, 3, 4].map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="button"
-            className={cn(styles.globalDanmaku, globalDanmakuEnabled && styles.globalDanmakuActive)}
-            onClick={() =>
-              setWorkspace((previous) => ({
-                ...previous,
-                globalDanmakuEnabled: !previous.globalDanmakuEnabled,
-              }))
-            }
-            aria-pressed={globalDanmakuEnabled}
-            title={globalDanmakuEnabled ? "关闭所有房间弹幕" : "开启所有房间弹幕"}
-          >
-            {globalDanmakuEnabled ? <MessageSquare size={15} /> : <MessageSquareOff size={15} />}
-            <span>全局弹幕</span>
-          </button>
-        </div>
-      </header>
-
-      <div className={styles.feedback} aria-live="polite">
-        {error && (
-          <p className={styles.error} role="alert">
-            {error}
-          </p>
-        )}
-        {!error && notice && (
-          <p className={styles.notice}>
-            <Check size={13} />
-            {notice}
-          </p>
-        )}
-      </div>
+      )}
 
       {rooms.length === 0 ? (
         <div
@@ -343,7 +267,6 @@ export function MonitorPage() {
                 room={room}
                 placement={placement}
                 focused={audioFocusKeys.includes(room.key)}
-                globalDanmakuEnabled={globalDanmakuEnabled}
                 onAudioFocus={handleAudioFocus}
                 onDanmakuToggle={(key) =>
                   setWorkspace((previous) => ({
@@ -353,7 +276,18 @@ export function MonitorPage() {
                     ),
                   }))
                 }
+                onDanmakuSettingsChange={(key, patch) =>
+                  setWorkspace((previous) => ({
+                    ...previous,
+                    rooms: previous.rooms.map((item) =>
+                      item.key === key
+                        ? { ...item, danmakuSettings: { ...item.danmakuSettings, ...patch } }
+                        : item,
+                    ),
+                  }))
+                }
                 onVolumeChange={(key, volume) => updateRoom(key, { volume })}
+                onQualityChange={(key, qualityId) => updateRoom(key, { qualityId })}
                 onRemove={removeRoom}
                 onMove={moveRoom}
                 onResize={handleResize}

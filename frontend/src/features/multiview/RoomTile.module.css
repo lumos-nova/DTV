@@ -140,20 +140,78 @@
   color: rgba(255, 255, 255, 0.82);
 }
 
+.playbackControls,
+.roomControls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+}
+
 .iconButton:hover,
 .activeButton {
   background: rgba(255, 255, 255, 0.14);
   color: #fff;
 }
 
+.iconButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .activeButton {
   color: #a7f3d0;
+}
+
+.qualityControl {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: rgba(255, 255, 255, 0.88);
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.qualityControl:hover {
+  color: #fff;
+}
+
+.qualityControl select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.qualityControl select:disabled {
+  cursor: not-allowed;
+}
+
+.qualityControl:has(select:disabled) {
+  opacity: 0.4;
+}
+
+.refreshing svg {
+  animation: rotate 900ms linear infinite;
+}
+
+@keyframes rotate {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .footer {
   inset: auto 0 0;
   min-height: 36px;
-  padding: 5px 10px;
+  gap: 5px;
+  padding: 5px 8px;
   background: linear-gradient(0deg, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.28));
 }
 
@@ -322,6 +380,24 @@
 
   .iconButton {
     width: 23px;
+  }
+
+  .footer,
+  .playbackControls,
+  .roomControls {
+    gap: 2px;
+  }
+
+  .footer {
+    padding: 4px;
+  }
+
+  .volumeControl {
+    gap: 3px;
+  }
+
+  .volumeValue {
+    width: 27px;
   }
 }
 
